@@ -90,6 +90,7 @@ Only `command` and `run` are required. All other fields are optional.
 | `botAdmin` | `boolean` | Require the bot to be a group admin. |
 | `limit` | `boolean \| number` | Deduct user limit before execution. (`true` = 1) |
 | `energy` | `boolean \| number` | Deduct user energy before execution. (`true` = 1) |
+| `setCommand` | `boolean` | For plain-TEXT display plugins only (see §10) — auto-registers an owner-only `/set<command>` letting the owner customize the output via a template string. Don't use this on functional plugins (downloads, AI, etc). |
 | `run(m, ctx)` | `Function` | Main plugin handler. |
 
 If a plugin doesn't define `command`, it is automatically registered as an event listener.
@@ -333,7 +334,52 @@ The bot already enforces a per-sender lock at the `Listener.js` level — a send
 
 ---
 
-## 9. Existing Categories
+## 9. Customizable Text Plugins (`setCommand`)
+
+For plugins that only display text/info with no real function — e.g. `credits` — set `setCommand: true` instead of building a separate `/setX` plugin by hand:
+
+```js
+import { buildNativeFlowItem, renderTemplate } from '../../lib/Template.js'
+
+export default {
+   command: 'credits',
+   category: 'other',
+   setCommand: true,
+   async run(m, ctx) {
+      const raw = ctx.setting.customTemplates?.credits
+
+      const rendered = raw
+         ? renderTemplate(raw, m, ctx)
+         : { text: 'Default text here', hasThumbnail: false, buttons: [], mentions: [] }
+
+      // ... send using rendered.text / rendered.hasThumbnail / rendered.buttons / rendered.mentions
+   }
+}
+```
+
+This automatically registers `/set<command>` (e.g. `/setcredits`) — owner-only, no extra file needed. The owner runs it with a template string using these tags:
+
+| Tag | Meaning |
+|---|---|
+| `<thumbnail>` | Flag: attach `botThumbnail` as an image. Position doesn't matter, stripped from the text. |
+| `<cta,type,text,isi>` | One interactive button. `type`: `url`, `call`, or `copy`. |
+| `<user>` | @mention of whoever sent the command |
+| `<pushname>` | Sender's display name |
+| `<botname>` / `<ownername>` / `<ownernumber>` | Bot/owner identity |
+| `<runtime>` | Process uptime |
+| `<date>` / `<time>` / `<greeting>` | Current date/time/time-of-day greeting |
+| `<prefix>` | Prefix used for this invocation |
+| `<groupname>` | Current group's name (`-` in private chat) |
+| `<totalusers>` / `<totalgroups>` | Registered user/group counts |
+| `<version>` | Bot version from `package.json` |
+| `<donate>` / `<github>` | Configured donate URL / GitHub repo |
+| `<commandcount>` / `<plugincount>` | Currently loaded command/plugin counts |
+
+`/set<command> reset` reverts to the plugin's own default output.
+
+Do NOT use `setCommand` on plugins that perform an actual action (downloads, AI generation, stalking, etc.) — it's only for plain informational/text output.
+
+## 10. Existing Categories
 
 Refer to:
 
